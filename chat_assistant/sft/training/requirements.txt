@@ -1,7 +1,7 @@
-git+https://github.com/huggingface/transformers
-git+https://github.com/huggingface/accelerate
-git+https://github.com/huggingface/peft
-git+https://github.com/huggingface/trl
+transformers
+accelerate
+peft
+trl
 huggingface-hub
 bitsandbytes
 evaluate
