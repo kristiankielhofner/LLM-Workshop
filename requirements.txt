@@ -3,7 +3,6 @@ accelerate
 peft
 trl
 datatrove
-unsloth[conda]
 deepspeed
 PyGithub
 flash-attn
