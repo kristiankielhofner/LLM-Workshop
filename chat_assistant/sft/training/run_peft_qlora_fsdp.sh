@@ -1,6 +1,6 @@
 accelerate launch --config_file "configs/fsdp_config_qlora.yaml"  train.py \
 --seed 100 \
---model_name_or_path "meta-llama/Llama-2-70b-hf" \
+--model_name_or_path "meta-llama/Meta-Llama-3-70B" \
 --dataset_name "smangrul/ultrachat-10k-chatml" \
 --chat_template_format "chatml" \
 --add_special_tokens False \
