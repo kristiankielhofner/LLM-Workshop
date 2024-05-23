@@ -24,8 +24,8 @@ accelerate launch --config_file "configs/fsdp_config_qlora.yaml"  train.py \
 --warmup_ratio 0.0 \
 --max_grad_norm 1.0 \
 --output_dir "llama-sft-qlora-fsdp" \
---per_device_train_batch_size 2 \
---per_device_eval_batch_size 2 \
+--per_device_train_batch_size 1 \
+--per_device_eval_batch_size 1 \
 --gradient_accumulation_steps 2 \
 --gradient_checkpointing True \
 --use_reentrant True \
