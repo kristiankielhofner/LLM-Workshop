@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=hello_world
-#SBATCH --nodes=3
+#SBATCH --nodes=2
 #SBATCH --ntasks-per-node=1          # crucial - only 1 task per dist per node!
 #SBATCH --cpus-per-task=2
 ##SBATCH --mem-per-cpu=11G # Important to enable "mix" use of GPUs across cluster users
@@ -13,7 +13,7 @@
 set -e
 
 echo "START TIME: $(date)"
-echo "Hostname is $HOSTNAME"
+echo "Hostname: $HOSTNAME"
 
 # CHANGE HERE THE CONDA EVN AND ANY STARTUP SCRIPTS
 #source ~/.bashrc
@@ -31,6 +31,32 @@ else
     WANDB_DISABLED=true
 fi
 
+ACCELERATE_CONFIG="configs/deepspeed_config_z3_qlora.yaml"
+#ACCELERATE_CONFIG="configs/fsdp_config_qlora.yaml"#
+HF_MODEL="mistralai/Mistral-7B-v0.3"
+#HF_MODEL="meta-llama/Meta-Llama-3-8B"
+#HF_MODEL="meta-llama/Llama-2-7b-hf"
+
+# HF Dataset
+HF_DATASET="smangrul/ultrachat-10k-chatml"
+
+# Build Project ID for output directory and wandb
+PROJECT_MODEL=$(basename $HF_MODEL)
+PROJECT_DATASET=$(basename $HF_DATASET)
+PROJECT_CONFIG=$(basename $ACCELERATE_CONFIG | sed -e 's/.yaml//')
+PROJECT_ID=${PROJECT_MODEL}-${PROJECT_DATASET}-${PROJECT_CONFIG}
+#PROJECT_ID="llama-sft-qlora-fsdp"
+
+echo "Project ID: $PROJECT_ID"
+
+# Make sure we have model and dataset
+# Download here to cache so compute nodes don't fight
+echo "Downloading $HF_MODEL"
+huggingface-cli download --resume-download ${HF_MODEL}
+
+echo "Downloading $HF_DATASET"
+huggingface-cli download --resume-download --repo-type dataset ${HF_DATASET}
+
 # Attempt to add current directory as safe to git to silence warnings
 git config --global --add safe.directory ${PWD} || true
 
@@ -45,8 +71,8 @@ cd ${WORK_DIR}
 # export TORCHELASTIC_ERROR_FILE=/tmp/torch-elastic-error.json
 
 # force crashing on nccl issues like hanging broadcast
-TORCH_NCCL_ASYNC_ERROR_HANDLING=1
-NCCL_DEBUG=INFO
+export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
+export NCCL_DEBUG=INFO
 # export NCCL_DEBUG_SUBSYS=COLL
 # export NCCL_SOCKET_NTHREADS=1
 # export NCCL_NSOCKS_PERTHREAD=1
@@ -77,7 +103,7 @@ echo "Master socket is ${MASTER_ADDR}:${MASTER_PORT}"
 # OTHER LAUNCHERS CAN BE USED HERE
 # Note: it is important to escape `$SLURM_PROCID` since we want the srun on each node to evaluate this variable
 LAUNCHER="accelerate launch \
-    --config_file configs/fsdp_config_qlora.yaml \
+    --config_file $ACCELERATE_CONFIG \
     --main_process_ip $MASTER_ADDR \
     --main_process_port $MASTER_PORT \
     --machine_rank \$SLURM_PROCID \
@@ -88,8 +114,8 @@ LAUNCHER="accelerate launch \
 PROGRAM="\
     train.py \
         --seed 100 \
-        --model_name_or_path "mistralai/Mistral-7B-v0.1" \
-        --dataset_name "smangrul/ultrachat-10k-chatml" \
+        --model_name_or_path $HF_MODEL \
+        --dataset_name $HF_DATASET \
         --chat_template_format "chatml" \
         --add_special_tokens False \
         --append_concat_token False \
@@ -111,7 +137,7 @@ PROGRAM="\
         --weight_decay 1e-4 \
         --warmup_ratio 0.0 \
         --max_grad_norm 1.0 \
-        --output_dir "llama-sft-qlora-fsdp" \
+        --output_dir $PROJECT_ID \
         --per_device_train_batch_size 1 \
         --per_device_eval_batch_size 1 \
         --gradient_accumulation_steps 2 \
