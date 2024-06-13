@@ -2,7 +2,7 @@
 #SBATCH --job-name=hello_world
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=1          # crucial - only 1 task per dist per node!
-#SBATCH --cpus-per-task=2
+#SBATCH --cpus-per-task=8
 ##SBATCH --mem-per-cpu=11G # Important to enable "mix" use of GPUs across cluster users
 #SBATCH --partition=batch
 #SBATCH --gres=gpu:2 # Adjust number of GPUs here
@@ -12,6 +12,9 @@
 # Bail on error
 set -e
 
+# Export everything to be sure
+set -a
+
 echo "START TIME: $(date)"
 echo "Hostname: $HOSTNAME"
 
@@ -20,13 +23,13 @@ echo "Hostname: $HOSTNAME"
 #source /etc/profile.d/conda.sh
 #conda init
 #source activate base
-#conda activate /local/mgpu/conda
+#conda activate /data/mgpu/conda
 
 echo "Using Python: $(which python3)"
 
 # netrc for wandb
-if [ -r /local/mgpu/netrc ]; then
-    cp /local/mgpu/netrc /root/.netrc
+if [ -r /data/mgpu/netrc ]; then
+    cp /data/mgpu/netrc /root/.netrc
 else
     WANDB_DISABLED=true
 fi
@@ -45,7 +48,6 @@ PROJECT_MODEL=$(basename $HF_MODEL)
 PROJECT_DATASET=$(basename $HF_DATASET)
 PROJECT_CONFIG=$(basename $ACCELERATE_CONFIG | sed -e 's/.yaml//')
 PROJECT_ID=${PROJECT_MODEL}-${PROJECT_DATASET}-${PROJECT_CONFIG}
-#PROJECT_ID="llama-sft-qlora-fsdp"
 
 echo "Project ID: $PROJECT_ID"
 
@@ -57,7 +59,7 @@ huggingface-cli download --resume-download ${HF_MODEL}
 echo "Downloading $HF_DATASET"
 huggingface-cli download --resume-download --repo-type dataset ${HF_DATASET}
 
-# Attempt to add current directory as safe to git to silence warnings
+# Attempt to add current directory as safe to git to silence warnings for wandb
 git config --global --add safe.directory ${PWD} || true
 
 WORK_DIR=${PWD}/chat_assistant/sft/training
@@ -71,8 +73,8 @@ cd ${WORK_DIR}
 # export TORCHELASTIC_ERROR_FILE=/tmp/torch-elastic-error.json
 
 # force crashing on nccl issues like hanging broadcast
-export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
-export NCCL_DEBUG=INFO
+TORCH_NCCL_ASYNC_ERROR_HANDLING=1
+NCCL_DEBUG=INFO
 # export NCCL_DEBUG_SUBSYS=COLL
 # export NCCL_SOCKET_NTHREADS=1
 # export NCCL_NSOCKS_PERTHREAD=1
@@ -158,9 +160,6 @@ PROGRAM="\
 
 # Put final command together
 CMD="$LAUNCHER $PROGRAM"
-
-# Export everything to be sure
-set -a
 
 echo "Current environment:"
 set
